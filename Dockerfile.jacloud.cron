@@ -1,0 +1,26 @@
+FROM alpine:3.13
+LABEL Maintainer="Tim de Pater <code@trafex.nl>" \
+      Description="Lightweight container with Nginx 1.18 & PHP 7.4 based on Alpine Linux."
+
+# make sure add PATH backend/ for deploy to Jenkins #
+
+# Install packages and remove default server definition
+RUN apk --no-cache add php7 php7-fpm php7-opcache php7-mysqli php7-json php7-openssl php7-curl \
+    php7-zlib php7-xml php7-phar php7-intl php7-dom php7-xmlreader php7-ctype php7-session php7-fileinfo php7-tokenizer php7-pdo_pgsql \ 
+    php7-simplexml php7-iconv php7-xmlwriter php7-zip bash \
+    php7-mbstring php7-gd curl
+
+# Setup document root
+RUN mkdir -p /var/www/html
+
+# Add application
+WORKDIR /var/www/html
+COPY . /var/www/html
+COPY --from=composer:2.0.9 /usr/bin/composer /usr/local/bin/composer
+
+RUN php /usr/local/bin/composer install --no-dev --optimize-autoloader -d backend/
+
+# reference https://forums.docker.com/t/how-to-run-a-cron-job-inside-a-container-alpine/7759/7 #
+RUN echo '* * * * * /usr/local/bin/php /var/www/html/backend/artisan schedule:run >> /dev/null 2>&1' > /etc/crontabs/root
+
+CMD ["/usr/sbin/crond", "-l","2", "-f"]

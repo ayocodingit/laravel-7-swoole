@@ -1,0 +1,196 @@
+def secretsProd = [
+  [path: 'kv-labkes-api/production/app', engineVersion: 2, secretValues: [
+
+    [envVar: 'APP_NAME', vaultKey: 'APP_NAME'],
+    [envVar: 'APP_ENV', vaultKey: 'APP_ENV'],
+    [envVar: 'APP_KEY', vaultKey: 'APP_KEY'],
+    [envVar: 'APP_DEBUG', vaultKey: 'APP_DEBUG'],
+    [envVar: 'APP_URL', vaultKey: 'APP_URL'],
+
+    [envVar: 'API_URL', vaultKey: 'API_URL'],
+    [envVar: 'LOG_CHANNEL', vaultKey: 'LOG_CHANNEL'],
+    [envVar: 'DB_CONNECTION', vaultKey: 'DB_CONNECTION'],
+    [envVar: 'DB_HOST', vaultKey: 'DB_HOST'],
+    [envVar: 'DB_PORT', vaultKey: 'DB_PORT'],
+
+    [envVar: 'DB_DATABASE', vaultKey: 'DB_DATABASE'],
+    [envVar: 'DB_USERNAME', vaultKey: 'DB_USERNAME'],
+    [envVar: 'DB_PASSWORD', vaultKey: 'DB_PASSWORD'],
+    [envVar: 'BROADCAST_DRIVER', vaultKey: 'BROADCAST_DRIVER'],
+    [envVar: 'CACHE_DRIVER', vaultKey: 'CACHE_DRIVER'],
+
+    [envVar: 'QUEUE_CONNECTION', vaultKey: 'QUEUE_CONNECTION'],
+    [envVar: 'SESSION_DRIVER', vaultKey: 'SESSION_DRIVER'],
+    [envVar: 'SESSION_LIFETIME', vaultKey: 'SESSION_LIFETIME'],
+    [envVar: 'AWS_ACCESS_KEY_ID', vaultKey: 'AWS_ACCESS_KEY_ID'],
+    [envVar: 'AWS_SECRET_ACCESS_KEY', vaultKey: 'AWS_SECRET_ACCESS_KEY'],
+
+    [envVar: 'AWS_DEFAULT_REGION', vaultKey: 'AWS_DEFAULT_REGION'],
+    [envVar: 'AWS_BUCKET', vaultKey: 'AWS_BUCKET'],
+    [envVar: 'JWT_TTL', vaultKey: 'JWT_TTL'],
+    [envVar: 'JWT_SECRET', vaultKey: 'JWT_SECRET'],
+    [envVar: 'SENTRY_LARAVEL_DSN', vaultKey: 'SENTRY_LARAVEL_DSN'],
+
+    [envVar: 'PELAPORAN_KEY', vaultKey: 'PELAPORAN_KEY'],
+    [envVar: 'PELAPORAN_URL', vaultKey: 'PELAPORAN_URL'],
+    [envVar: 'TES_MASIF_KEY', vaultKey: 'TES_MASIF_KEY']]],
+
+]
+
+def configuration = [vaultUrl: "${VAULT_JABAR_CLOUD}",  vaultCredentialId: 'approle-labkes', engineVersion: 2]
+
+pipeline {
+
+    agent any
+
+    environment {
+        appName = 'api-labkes-production'
+        PROJECT_REGISTRY ='labkes-pikobar'
+        VERSION = "${BUILD_TAG}"
+        URL_REGISTRY = "${URL_REGISTRY_JACLOUD}"
+
+        VAULT_JABAR_CLOUD = "${VAULT_JABAR_CLOUD}"
+
+        KUBECONFIG_LABKES_PROD = "${KUBECONFIG_LABKES_PROD}"
+        CLIENT_KEY_LABKES_PROD = "${CLIENT_KEY_LABKES_PROD}"
+        CLUSTER_NAME_JACLOUD = "k8s-jacloud001-JDS-RANCHER-NODE-03"        
+    }
+
+    options {
+        timeout(time: 1, unit: 'HOURS')
+    }
+
+     triggers {
+                githubPush()
+     }
+
+    stages{
+
+        stage('stage build labkes api production'){
+
+            steps {
+
+                withVault([configuration: configuration, vaultSecrets: secretsProd]) { 
+                        
+                        sh 'echo $VERSION > version.txt'
+                        sh 'docker build --tag $appName:$VERSION -f backend/Dockerfile.jacloud . --no-cache'
+                    }
+                stash includes: 'version.txt', name: 'version'
+            }
+
+            post {
+                always {
+                    archiveArtifacts artifacts: 'version.txt', fingerprint: true
+                    cleanWs()
+                }
+            }
+        }
+
+        stage('push to registry labkes jabarcloud'){
+
+            steps {
+                script {
+                    withDockerRegistry([credentialsId: '718c9252-2b43-4f24-8bf9-1f68d19e848b', url: "https://${URL_REGISTRY}"]) {
+                    // code block
+                    unstash 'version'
+                    sh 'cat version.txt'
+                    sh 'export REGISTRY_HTTP_RELATIVEURLS=true \
+                        && docker tag $appName:$VERSION $URL_REGISTRY/$PROJECT_REGISTRY/$appName:$VERSION \
+                        && docker push $URL_REGISTRY/$PROJECT_REGISTRY/$appName:$VERSION \
+                        && docker rmi $appName:$VERSION \
+                        && docker rmi $URL_REGISTRY/$PROJECT_REGISTRY/$appName:$VERSION'
+                        }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'version.txt', fingerprint: true
+                    cleanWs()
+                }
+            }
+        }
+
+         stage ('deploy to kubernetes jabarcloud'){
+            agent {
+                docker { 
+                    image 'dtzar/helm-kubectl:3.3.1'
+                    args '-u root'
+                }
+            }
+
+            steps {
+                    // deploy kubernetes cluster production
+                    withVault([configuration: configuration, vaultSecrets: secretsProd]) {   
+         
+                        sh 'sed -i "s/%VERSION%/${VERSION}/g" backend/kubernetes/production/deployment-labkes-api.yaml'
+
+                        sh 'sed -i "s/%APP_NAME%/${APP_NAME}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%APP_ENV%/${APP_ENV}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%APP_KEY%/${APP_KEY}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%APP_DEBUG%/${APP_DEBUG}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%APP_URL%/${APP_URL}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+
+                        sh 'sed -i "s/%API_URL%/${API_URL}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%LOG_CHANNEL%/${LOG_CHANNEL}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%DB_CONNECTION%/${DB_CONNECTION}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%DB_HOST%/${DB_HOST}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%DB_PORT%/${DB_PORT}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+
+                        sh 'sed -i "s/%DB_DATABASE%/${DB_DATABASE}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%DB_USERNAME%/${DB_USERNAME}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%DB_PASSWORD%/${DB_PASSWORD}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%BROADCAST_DRIVER%/${BROADCAST_DRIVER}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%CACHE_DRIVER%/${CACHE_DRIVER}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+
+                        sh 'sed -i "s/%QUEUE_CONNECTION%/${QUEUE_CONNECTION}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%SESSION_DRIVER%/${SESSION_DRIVER}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%SESSION_LIFETIME%/${SESSION_LIFETIME}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%AWS_ACCESS_KEY_ID%/${AWS_ACCESS_KEY_ID}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%AWS_SECRET_ACCESS_KEY%/${AWS_SECRET_ACCESS_KEY}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+
+                        sh 'sed -i "s/%AWS_DEFAULT_REGION%/${AWS_DEFAULT_REGION}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%AWS_BUCKET%/${AWS_BUCKET}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%JWT_TTL%/${JWT_TTL}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%JWT_SECRET%/${JWT_SECRET}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%SENTRY_LARAVEL_DSN%/${SENTRY_LARAVEL_DSN}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+
+                        sh 'sed -i "s/%PELAPORAN_KEY%/${PELAPORAN_KEY}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%PELAPORAN_URL%/${PELAPORAN_URL}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        sh 'sed -i "s/%TES_MASIF_KEY%/${TES_MASIF_KEY}/g" backend/kubernetes/production/configmap-labkes-api.yaml'
+                        
+
+
+                        sh '''
+                            set +x
+                            echo $KUBECONFIG_LABKES_PROD | base64 -d > kubeconfig
+                            export KUBECONFIG=./kubeconfig
+                            echo $CLIENT_KEY_LABKES_PROD | base64 -d > client.key
+                            set -x
+                            kubectl config set-credentials labkes-dev --client-key=client.key --embed-certs=true
+                            kubectl config set-cluster $CLUSTER_NAME_JACLOUD --insecure-skip-tls-verify=true
+
+                            kubectl apply -f backend/kubernetes/production/deployment-labkes-api.yaml --dry-run=client --validate
+                            kubectl apply -f backend/kubernetes/production/service-labkes-api.yaml --dry-run=client --validate
+                            kubectl apply -f backend/kubernetes/production/configmap-labkes-api.yaml --dry-run=client --validate
+
+                            kubectl apply -f backend/kubernetes/production/deployment-labkes-api.yaml
+                            kubectl apply -f backend/kubernetes/production/configmap-labkes-api.yaml
+                            kubectl apply -f backend/kubernetes/production/service-labkes-api.yaml
+                            kubectl get pods --namespace pikobar-labkes
+                        '''
+                    }
+              }
+
+              post {
+                  always{
+                    cleanWs()
+                  }
+              }
+        }
+
+
+
+        
+    } 
+
+}

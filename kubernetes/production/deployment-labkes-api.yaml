@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: labkes-api-app
+  namespace: pikobar-labkes
+  labels:
+    app: labkes-api-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: labkes-api-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: labkes-api-app
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: labkes-api-app
+          image: registry.digitalservice.id/labkes-pikobar/api-labkes-production:%VERSION%
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "1024Mi"
+              cpu: "500m"
+          envFrom:
+          - configMapRef:
+              name: labkes-configmap-file-prod
+      imagePullSecrets:
+        - name: regcred-labkes
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/os
+                operator: In
+                values:
+                - linux 
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - jds-rancher-node-01
+                - jds-rancher-node-02
+                - jds-rancher-node-03
+                - jds-rancher-node-04

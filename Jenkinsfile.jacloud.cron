@@ -1,0 +1,105 @@
+pipeline {
+
+    agent any
+
+    environment {
+        appName = 'cron-api-labkes-production'
+        PROJECT_REGISTRY ='labkes-pikobar'
+        VERSION = "${BUILD_TAG}"
+        URL_REGISTRY = "${URL_REGISTRY_JACLOUD}"
+
+        KUBECONFIG_LABKES_PROD = "${KUBECONFIG_LABKES_PROD}"
+        CLIENT_KEY_LABKES_PROD = "${CLIENT_KEY_LABKES_PROD}"
+        CLUSTER_NAME_JACLOUD = "k8s-jacloud001-JDS-RANCHER-NODE-03"        
+    }
+
+    options {
+        timeout(time: 1, unit: 'HOURS')
+    }
+
+     triggers {
+                githubPush()
+     }
+
+    stages{
+
+        stage('stage build labkes api production'){
+
+            steps {
+            
+                    sh 'echo $VERSION > version.txt'
+                    sh 'docker build --tag $appName:$VERSION -f backend/Dockerfile.jacloud.cron . --no-cache'
+                    stash includes: 'version.txt', name: 'version'
+            }
+
+            post {
+                always {
+                    archiveArtifacts artifacts: 'version.txt', fingerprint: true
+                    cleanWs()
+                }
+            }
+        }
+
+        stage('push to registry labkes jabarcloud'){
+
+            steps {
+                script {
+                    withDockerRegistry([credentialsId: '718c9252-2b43-4f24-8bf9-1f68d19e848b', url: "https://${URL_REGISTRY}"]) {
+                    // code block
+                    unstash 'version'
+                    sh 'cat version.txt'
+                    sh 'export REGISTRY_HTTP_RELATIVEURLS=true \
+                        && docker tag $appName:$VERSION $URL_REGISTRY/$PROJECT_REGISTRY/$appName:$VERSION \
+                        && docker push $URL_REGISTRY/$PROJECT_REGISTRY/$appName:$VERSION \
+                        && docker rmi $appName:$VERSION \
+                        && docker rmi $URL_REGISTRY/$PROJECT_REGISTRY/$appName:$VERSION'
+                        }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'version.txt', fingerprint: true
+                    cleanWs()
+                }
+            }
+        }
+
+         stage ('deploy to kubernetes jabarcloud'){
+            agent {
+                docker { 
+                    image 'dtzar/helm-kubectl:3.3.1'
+                    args '-u root'
+                }
+            }
+
+            steps {
+                   
+                sh 'sed -i "s/%VERSION%/${VERSION}/g" backend/kubernetes/production/deployment-labkes-api-cron.yaml'
+                sh '''
+                    set +x
+                    echo $KUBECONFIG_LABKES_PROD | base64 -d > kubeconfig
+                    export KUBECONFIG=./kubeconfig
+                    echo $CLIENT_KEY_LABKES_PROD | base64 -d > client.key
+                    set -x
+                    kubectl config set-credentials labkes-dev --client-key=client.key --embed-certs=true
+                    kubectl config set-cluster $CLUSTER_NAME_JACLOUD --insecure-skip-tls-verify=true
+                    kubectl apply -f backend/kubernetes/production/deployment-labkes-api-cron.yaml --dry-run=client --validate
+                    kubectl apply -f backend/kubernetes/production/deployment-labkes-api-cron.yaml
+                    kubectl get pods --namespace pikobar-labkes
+                    '''
+                    
+              }
+
+              post {
+                  always{
+                    cleanWs()
+                  }
+              }
+        }
+
+
+
+        
+    } 
+
+}

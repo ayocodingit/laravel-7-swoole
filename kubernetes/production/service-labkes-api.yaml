@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name:  labkes-api-app
+  namespace: pikobar-labkes
+  labels:
+    app:  labkes-api-app
+spec:
+  selector:
+    app:  labkes-api-app
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: labkes-api-cron
+  namespace: pikobar-labkes
+  labels:
+    app: labkes-api-cron
+spec:
+  selector:
+    matchLabels:
+      app: labkes-api-cron
+  template:
+    metadata:
+      labels:
+        app: labkes-api-cron
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: labkes-api-cron
+          image: registry.digitalservice.id/labkes-pikobar/cron-api-labkes-production:%VERSION%
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "1024Mi"
+              cpu: "500m"
+          envFrom:
+          - configMapRef:
+              name: labkes-configmap-file-prod
+      imagePullSecrets:
+        - name: regcred-labkes
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/os
+                operator: In
+                values:
+                - linux 
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - jds-rancher-node-01
+                - jds-rancher-node-02
+                - jds-rancher-node-03
+                - jds-rancher-node-04
