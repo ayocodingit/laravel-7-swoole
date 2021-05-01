@@ -74,8 +74,6 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Run composer install to install the dependencies
 RUN composer install
 
-RUN php artisan optimize
-
 ARG DOCKER_APP
 ENV DOCKER_APP $DOCKER_APP
 
