@@ -74,9 +74,6 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Run composer install to install the dependencies
 RUN composer install
 
-
-RUN php -r "file_exists('.env') || copy('.env-example', '.env');"
-RUN php artisan key:generate
 RUN php artisan optimize
 
 ARG DOCKER_APP
