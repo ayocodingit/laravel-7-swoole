@@ -42,13 +42,14 @@ RUN apk --no-cache add php7 \
     php7-posix \
     php7-iconv \
     php7-swoole \
+    nginx \
     supervisor
 
 # https://github.com/codecasts/php-alpine/issues/21
 RUN ln -s /usr/bin/php7 /usr/bin/php
 
 # Configure nginx
-# COPY docker-config/nginx.conf /etc/nginx/nginx.conf
+COPY docker-config/nginx.conf /etc/nginx/nginx.conf
 
 # Remove default server definition
 # RUN rm /etc/nginx/conf.d/default.conf
@@ -65,7 +66,9 @@ RUN mkdir -p /var/www/html
 
 # Make sure files/folders needed by the processes are accessable when they run under the nobody user
 RUN chown -R nobody.nobody /var/www/html && \
-    chown -R nobody.nobody /run
+    chown -R nobody.nobody /run && \
+    chown -R nobody.nobody /var/lib/nginx && \
+    chown -R nobody.nobody /var/log/nginx
 
 # Switch to use a non-root user from here on
 USER nobody
@@ -76,16 +79,7 @@ RUN chmod +x docker-config/docker-entrypoint.sh
 # Install composer from the official image
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 # Run composer install to install the dependencies
-RUN php /usr/local/bin/composer install --no-cache --no-dev --optimize-autoloader
-
-ARG DOCKER_APP
-ENV DOCKER_APP $DOCKER_APP
-
-ARG OCTANE_WORKER
-ENV OCTANE_WORKER $OCTANE_WORKER
-
-ARG OCTANE_SERVER
-ENV OCTANE_SERVER $OCTANE_SERVER
+RUN php /usr/local/bin/composer install --no-cache --no-dev && composer dump-autoload
 # Expose the port nginx is reachable on
 EXPOSE 8080
 # Let supervisord start nginx & php-fpm
