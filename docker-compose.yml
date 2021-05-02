@@ -1,9 +1,8 @@
-version: '2'
+version: '2.2'
 services:
   app:
     build: .
     restart: always
-    container_name: php-7-swoole
     ports:
       - "8085:8080"
     mem_limit: 1073741824
