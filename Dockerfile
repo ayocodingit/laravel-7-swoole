@@ -8,6 +8,10 @@ RUN apk --update-cache add ca-certificates
 
 RUN echo "https://dl.bintray.com/php-alpine/v3.11/php-7.4" >> /etc/apk/repositories
 
+# Fix iconv issue when generate pdf
+RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/ --allow-untrusted gnu-libiconv
+ENV LD_PRELOAD /usr/lib/preloadable_libiconv.so php
+
 # Install packages
 RUN apk --no-cache add php7 \
     nano \
