@@ -9,7 +9,7 @@ RUN apk --update-cache add ca-certificates
 RUN echo "https://dl.bintray.com/php-alpine/v3.11/php-7.4" >> /etc/apk/repositories
 
 # Fix iconv issue when generate pdf
-RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/ --allow-untrusted gnu-libiconv
+RUN apk add --no-cache --repository https://dl-cdn.alpinelinux.org/alpine/v3.11/community/ gnu-libiconv
 ENV LD_PRELOAD /usr/lib/preloadable_libiconv.so php
 
 # Install packages
@@ -74,9 +74,9 @@ WORKDIR /var/www/html
 COPY --chown=nobody . /var/www/html/
 RUN chmod +x docker-config/docker-entrypoint.sh
 # Install composer from the official image
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 # Run composer install to install the dependencies
-RUN composer install
+RUN php /usr/local/bin/composer install --no-cache --no-dev --optimize-autoloader
 
 ARG DOCKER_APP
 ENV DOCKER_APP $DOCKER_APP
