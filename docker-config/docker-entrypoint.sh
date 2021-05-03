@@ -2,4 +2,5 @@
 
 php artisan key:generate
 php artisan optimize
-php artisan swoole:http start
+/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+# php artisan swoole:http start

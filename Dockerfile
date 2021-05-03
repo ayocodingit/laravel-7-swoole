@@ -2,11 +2,13 @@ FROM alpine:3.11
 
 LABEL Maintainer="Firman Ayocoding <ayocodingit@gmail.com>"
 
-ADD https://dl.bintray.com/php-alpine/key/php-alpine.rsa.pub /etc/apk/keys/php-alpine.rsa.pub
-# make sure you can use HTTPS
-RUN apk --update-cache add ca-certificates
+# https://github.com/codecasts/php-alpine/issues/131
+ADD https://packages.whatwedo.ch/php-alpine.rsa.pub /etc/apk/keys/php-alpine.rsa.pub
 
-RUN echo "https://dl.bintray.com/php-alpine/v3.11/php-7.4" >> /etc/apk/repositories
+# make sure you can use HTTPS
+RUN apk --update add ca-certificates
+
+RUN echo "https://packages.whatwedo.ch/php-alpine/v3.11/php-7.4" >> /etc/apk/repositories
 
 # Fix iconv issue when generate pdf
 RUN apk add --no-cache --repository https://dl-cdn.alpinelinux.org/alpine/v3.11/community/ gnu-libiconv
@@ -52,7 +54,7 @@ RUN ln -s /usr/bin/php7 /usr/bin/php
 COPY docker-config/nginx.conf /etc/nginx/nginx.conf
 
 # Remove default server definition
-# RUN rm /etc/nginx/conf.d/default.conf
+RUN rm /etc/nginx/conf.d/default.conf
 
 # Configure PHP-FPM
 # COPY docker-config/fpm-pool.conf /etc/php7/php-fpm.d/www.conf
